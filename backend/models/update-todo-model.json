@@ -1,26 +1,20 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "title": "todo",
+  "title": "group",
   "type": "object",
   "properties": {
     "name": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
     },
     "dueDate": {
       "type": "string"
     },
     "done": {
       "type": "boolean"
-    },
-    "attachmentUrl": {
-      "type": "string"
-    },
-    "createdAt": {
-      "type": "string"
     }
   },
-  "required": [
-    "name"
-  ],
+  "required": ["name"],
   "additionalProperties": false
 }

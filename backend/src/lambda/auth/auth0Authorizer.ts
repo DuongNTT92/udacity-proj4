@@ -1,31 +1,16 @@
+import Axios from 'axios'
+import { verify, decode } from 'jsonwebtoken'
+import { error } from 'console'
 import { CustomAuthorizerEvent, CustomAuthorizerResult } from 'aws-lambda'
 import 'source-map-support/register'
 
-import { verify } from 'jsonwebtoken'
 import { createLogger } from '../../utils/logger'
+import { Jwt } from '../../auth/Jwt'
 import { JwtPayload } from '../../auth/JwtPayload'
 
 const logger = createLogger('auth')
-
-const cert = `-----BEGIN CERTIFICATE-----
-MIIDDTCCAfWgAwIBAgIJDZexx2pFnYs/MA0GCSqGSIb3DQEBCwUAMCQxIjAgBgNV
-BAMTGWRldi12MHR0dzBobi51cy5hdXRoMC5jb20wHhcNMjIwODA3MDk1MTI0WhcN
-MzYwNDE1MDk1MTI0WjAkMSIwIAYDVQQDExlkZXYtdjB0dHcwaG4udXMuYXV0aDAu
-Y29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApfrv63+oat8E6uKk
-mUwpK7077fGNPgKUjKWL+dl5nG6UTQSfIGXcCXXZCYetXyxeT2nBMCuZz5KT2REi
-1SZiPS5gJCRqen54OlQPFk9GzlTYH0eQ71ZTDdIKGx8gIO2V+aSnb6AtboTsF5bS
-JmHOJPTob5j+TwPdOfupiaiy6TVzFsBYy7n68CU4lLYwlj7f3Fm3QpFSYU+UOe7v
-5L/UtEwrPonCLFtreDd/YXaygzCZwqf8ArmNN4YHQ3QrL2jVAnYp9Z60604H3er0
-S+p/MDWMt65Hw+dgFugiS+IB8JWjMjp1m5P27HfXim/aesNWsh3J/NWVZJn/LXwE
-tTlk+wIDAQABo0IwQDAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTwp5TyQG1O
-NwufQVhXfqAzKhE7DDAOBgNVHQ8BAf8EBAMCAoQwDQYJKoZIhvcNAQELBQADggEB
-AIe0aIj4fBNyyuWbw5CNTKsBok0V6xToOgHupHQIXAwVUVAQncTBSiDgK4Q5cMz4
-pvytYwVP/IJNxmgj+UcMzYEA23PRokJ0Tkgks3DTr5daSiF1+SCUy2v0t9AmOyZO
-uWbf060S9lIvKSGUY519CPY0nA8geluiepN0zgrC2xk0wHFMzhllGlLlz0lPMmq7
-b2LoL7dD8G7wFvKEufg/NtM6/bSs0j4a6joSE66m3TGkKtTIyW8BNrYUWuO6AaCe
-NwApo4cXkyiIHlPmiuhsjkEngHHVmMtLbA98YvlCZvEqiHwrnxexhHH8otskiXMI
-zQFiD7Tc4ZxJNteN6tTcmVA=
------END CERTIFICATE-----`
+const jwksUrl =
+  'https://dev-2i2eajkyfku1snp2.us.auth0.com/.well-known/jwks.json'
 
 export const handler = async (
   event: CustomAuthorizerEvent
@@ -68,15 +53,38 @@ export const handler = async (
 }
 
 async function verifyToken(authHeader: string): Promise<JwtPayload> {
-  const token = getToken(authHeader)  
-  return verify(token, cert, { algorithms: ['RS256'] }) as JwtPayload
+  logger.info('Checking token', authHeader.slice(0, 20))
+  const token = getToken(authHeader)
+  const jwt: Jwt = decode(token, { complete: true }) as Jwt
+
+  console.log(jwt)
+
+  const response = await Axios.get(jwksUrl)
+  const JWTKey = response.data.keys.find((key) => (key.kid = jwt.header.kid))
+    ?.x5c?.[0]
+  logger.info('JWTKey', JWTKey)
+
+  if (!JWTKey) {
+    throw error('JWKS url does not contain key')
+  }
+
+  const cert = `-----BEGIN CERTIFICATE-----\n${JWTKey}\n-----END CERTIFICATE-----`
+  const verifiedToken = verify(token, cert, {
+    algorithms: ['RS256']
+  }) as JwtPayload
+
+  logger.info('End verifing token', verifiedToken)
+
+  return verifiedToken
 }
 
 function getToken(authHeader: string): string {
   if (!authHeader) throw new Error('No authentication header')
+
   if (!authHeader.toLowerCase().startsWith('bearer '))
     throw new Error('Invalid authentication header')
+
   const split = authHeader.split(' ')
-  const token = split[1]
-  return token
+
+  return split[1]
 }

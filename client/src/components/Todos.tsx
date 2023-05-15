@@ -47,10 +47,6 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
   onTodoCreate = async (event: React.ChangeEvent<HTMLButtonElement>) => {
     try {
       const dueDate = this.calculateDueDate()
-      if (!this.state.newTodoName) {
-        alert('Please input name of item!');
-        return;
-      }
       const newTodo = await createTodo(this.props.auth.getIdToken(), {
         name: this.state.newTodoName,
         dueDate
@@ -101,12 +97,7 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
         loadingTodos: false
       })
     } catch (e) {
-      //alert(`Failed to fetch todos: ${e.message}`)
-      let errorMessage = "Failed to fetch todos";
-      if(e instanceof Error) {
-      	errorMessage = e.message;
-      }
-      alert(errorMessage);
+      alert(`Failed to fetch todos: ${(e as Error).message}`)
     }
   }
 
@@ -168,26 +159,26 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
   renderTodosList() {
     return (
       <Grid padded>
-        {(this.state.todos.length ? this.state.todos : []).map((todo, pos) => {
+        {this.state.todos.map((todo, pos) => {
           return (
-            <Grid.Row key={todo?.todoId || ''}>
+            <Grid.Row key={todo.todoId}>
               <Grid.Column width={1} verticalAlign="middle">
                 <Checkbox
                   onChange={() => this.onTodoCheck(pos)}
-                  checked={todo?.done || false}
+                  checked={todo.done}
                 />
               </Grid.Column>
               <Grid.Column width={10} verticalAlign="middle">
-                {todo?.name || ''}
+                {todo.name}
               </Grid.Column>
               <Grid.Column width={3} floated="right">
-                {todo?.dueDate || ''}
+                {todo.dueDate}
               </Grid.Column>
               <Grid.Column width={1} floated="right">
                 <Button
                   icon
                   color="blue"
-                  onClick={() => this.onEditButtonClick(todo?.todoId || '')}
+                  onClick={() => this.onEditButtonClick(todo.todoId)}
                 >
                   <Icon name="pencil" />
                 </Button>
@@ -196,13 +187,13 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
                 <Button
                   icon
                   color="red"
-                  onClick={() => this.onTodoDelete(todo?.todoId || '')}
+                  onClick={() => this.onTodoDelete(todo.todoId)}
                 >
                   <Icon name="delete" />
                 </Button>
               </Grid.Column>
-              {todo?.attachmentUrl && (
-                <Image src={todo?.attachmentUrl || ''} size="small" wrapped />
+              {todo.attachmentUrl && (
+                <Image src={todo.attachmentUrl} size="small" wrapped />
               )}
               <Grid.Column width={16}>
                 <Divider />
