@@ -1,39 +1,43 @@
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
 import 'source-map-support/register'
+import * as middy from 'middy'
+import { cors } from 'middy/middlewares'
 
-import { APIGatewayProxyEvent, APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda'
-
-import { createLogger } from '../../utils/logger'
-import { createTodo } from '../../businessLogicLayer/todos'
 import { getUserId } from '../utils'
+import { createLogger } from '../../utils/logger'
+import { createTodo } from '../../businessLogic/todos'
 import { CreateTodoRequest } from '../../requests/CreateTodoRequest'
 
-export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  createLogger(`Processing event: ${event}`)
+const logger = createLogger('createTodo')
 
-  const newTodo: CreateTodoRequest = JSON.parse(event.body)
-  const userId = getUserId(event)
-  if (!newTodo.name) return {
-    statusCode: 500,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Credentials': true
-    },
-    body: JSON.stringify({
-      
-    })
+export const handler = middy(
+  async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+    logger.info('Processing CreateTodo event...')
+    const newTodo: CreateTodoRequest = JSON.parse(event.body)
+    const userId = getUserId(event)
+
+    try {
+      const newItem = await createTodo(userId, newTodo)
+      logger.info(`Successfully created a new todo item: ${newItem}`)
+
+      return {
+        statusCode: 201,
+        body: JSON.stringify({
+          item: newItem
+        })
+      }
+    } catch (err) {
+      logger.error(`Error: ${err.message}`)
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ err })
+      }
+    }
   }
-  
-  const item = await createTodo(userId, newTodo)
-  return {
-    statusCode: 201,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Credentials': true
-    },
-    body: JSON.stringify({
-      item
-    })
-  }
-}
+)
 
-
+handler.use(
+  cors({
+    credentials: true
+  })
+)

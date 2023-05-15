@@ -1,42 +1,41 @@
 import 'source-map-support/register'
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import * as middy from 'middy'
+import { cors, httpErrorHandler } from 'middy/middlewares'
 
-import { APIGatewayProxyEvent, APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda'
-
-import { UpdateTodoRequest } from '../../requests/UpdateTodoRequest'
-import { createLogger } from '../../utils/logger'
 import { getUserId } from '../utils'
-import { updateTodo, todoExists } from '../../businessLogicLayer/todos'
+import { createLogger } from '../../utils/logger'
+import { updateTodo } from '../../businessLogic/todos'
+import { UpdateTodoRequest } from '../../requests/UpdateTodoRequest'
 
-export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  createLogger(`Processing update todos event: ${event}`)
+const logger = createLogger('updateTodo')
 
-  const userId = getUserId(event)
-  const todoId = event.pathParameters.todoId
-  const isValidTodo = await todoExists(todoId, userId)
+export const handler = middy(
+  async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+    logger.info('Processing UpdateTodo event...')
+    const todoId = event.pathParameters.todoId
+    const updatedTodo: UpdateTodoRequest = JSON.parse(event.body)
+    const userId: string = getUserId(event)
 
-  if (!isValidTodo) {
-    return {
-      statusCode: 404,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Credentials': true
-      },
-      body: JSON.stringify({
-        error: 'Todo that you are trying to update does not exist'
-      })
+    try {
+      await updateTodo(userId, todoId, updatedTodo)
+      logger.info(`Successfully updated the todo item: ${todoId}`)
+      return {
+        statusCode: 200,
+        body: undefined
+      }
+    } catch (err) {
+      logger.error(`Error: ${err.message}`)
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ err })
+      }
     }
   }
+)
 
-  const updatedTodo: UpdateTodoRequest = JSON.parse(event.body)
-
-  await updateTodo(todoId, userId, updatedTodo)
-
-  return {
-    statusCode: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Credentials': true
-    },
-    body: JSON.stringify({})
-  }
-}
+handler.use(httpErrorHandler()).use(
+  cors({
+    credentials: true
+  })
+)

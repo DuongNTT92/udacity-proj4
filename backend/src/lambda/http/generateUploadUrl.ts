@@ -1,41 +1,40 @@
 import 'source-map-support/register'
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import * as middy from 'middy'
+import { cors, httpErrorHandler } from 'middy/middlewares'
 
-import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
-import { createLogger } from '../../utils/logger'
+import { createAttachmentPresignedUrl } from '../../businessLogic/todos'
 import { getUserId } from '../utils'
-import { getUploadUrl, todoExists } from '../../businessLogicLayer/todos'
+import { createLogger } from '../../utils/logger'
 
-export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  createLogger(`Processing upload image url corresponding to todo event: ${event}`)
+const logger = createLogger('generateUploadUrl')
 
-  const userId = getUserId(event)
-  const todoId = event.pathParameters.todoId
-  const isValidTodo = await todoExists(todoId, userId)
+export const handler = middy(
+  async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+    logger.info('Processing GenerateUploadUrl event...')
+    const todoId = event.pathParameters.todoId
+    const userId = getUserId(event)
 
-  if (!isValidTodo) {
-    return {
-      statusCode: 404,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Credentials': true
-      },
-      body: JSON.stringify({
-        error: 'Todo item to which you are trying to upload image does not exist'
-      })
+    try {
+      const uploadUrl = await createAttachmentPresignedUrl(userId, todoId)
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          uploadUrl
+        })
+      }
+    } catch (err) {
+      logger.error(`Error: ${err.message}`)
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ err })
+      }
     }
   }
+)
 
-  const imageUrl = await getUploadUrl(todoId, userId)
-
-  return {
-    statusCode: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Credentials': true
-    },
-    body: JSON.stringify({
-      uploadUrl: imageUrl
-    })
-  }
-}
-
+handler.use(httpErrorHandler()).use(
+  cors({
+    credentials: true
+  })
+)
