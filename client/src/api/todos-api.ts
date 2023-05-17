@@ -17,6 +17,22 @@ export async function getTodos(idToken: string): Promise<Todo[]> {
   return response.data.items
 }
 
+export async function getTodoByDate(
+  idToken: string,
+  date: string
+): Promise<Todo[]> {
+  console.log('Fetching todos by date')
+
+  const response = await Axios.get(`${apiEndpoint}/todos/date/${date}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+  })
+  console.log('Todos:', response.data)
+  return response.data.items
+}
+
 export async function createTodo(
   idToken: string,
   newTodo: CreateTodoRequest
