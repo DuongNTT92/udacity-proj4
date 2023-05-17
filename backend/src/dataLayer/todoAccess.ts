@@ -1,7 +1,8 @@
 import * as AWS from 'aws-sdk'
-import { createLogger } from '../utils/logger'
-import { DocumentClient } from 'aws-sdk/clients/dynamodb'
-import { TodoItem, TodoUpdate } from '../models'
+import {createLogger} from '../utils/logger'
+import {DocumentClient} from 'aws-sdk/clients/dynamodb'
+import {TodoItem, TodoUpdate} from '../models'
+
 const AWSXRay = require('aws-xray-sdk')
 
 const XAWS = AWSXRay.captureAWS(AWS)
@@ -27,12 +28,27 @@ export class TodoAccess {
     return response.Items as TodoItem[]
   }
 
+  async getTodoByDate(userId: string, createdAt: string): Promise<TodoItem[]> {
+    logger.info('Getting todo items by date')
+    const response = await this.docClient
+      .query({
+        TableName: this.todosTable,
+        KeyConditionExpression: 'userId = :userId',
+        FilterExpression: 'contains(createdAt, :createdAt)',
+        ExpressionAttributeValues: {
+          ':userId': userId,
+          ':createdAt': createdAt
+        },
+      }).promise()
+    return response.Items as TodoItem[]
+  }
+
   async createTodo(newTodo: TodoItem): Promise<TodoItem> {
     logger.info(`Creating new item: ${newTodo.todoId}`)
     await this.docClient.put({
-        TableName: this.todosTable,
-        Item: newTodo
-      }).promise()
+      TableName: this.todosTable,
+      Item: newTodo
+    }).promise()
 
     return newTodo
   }
@@ -44,25 +60,25 @@ export class TodoAccess {
   ): Promise<void> {
     logger.info(`Updating item: ${todoId}`)
     await this.docClient.update({
-        TableName: this.todosTable,
-        Key: { userId, todoId },
-        ConditionExpression: 'attribute_exists(todoId)',
-        UpdateExpression: 'set #n = :n, dueDate = :due, done = :dn',
-        ExpressionAttributeNames: { '#n': 'name' },
-        ExpressionAttributeValues: {
-          ':n': updatedTodo.name,
-          ':due': updatedTodo.dueDate,
-          ':dn': updatedTodo.done
-        },
-        ReturnValues: 'ALL_NEW'
-      }).promise()
+      TableName: this.todosTable,
+      Key: {userId, todoId},
+      ConditionExpression: 'attribute_exists(todoId)',
+      UpdateExpression: 'set #n = :n, dueDate = :due, done = :dn',
+      ExpressionAttributeNames: {'#n': 'name'},
+      ExpressionAttributeValues: {
+        ':n': updatedTodo.name,
+        ':due': updatedTodo.dueDate,
+        ':dn': updatedTodo.done
+      },
+      ReturnValues: 'ALL_NEW'
+    }).promise()
   }
 
   async deleteTodo(userId: string, todoId: string): Promise<void> {
     await this.docClient.delete({
-        TableName: this.todosTable,
-        Key: { userId, todoId }
-      }).promise()
+      TableName: this.todosTable,
+      Key: {userId, todoId}
+    }).promise()
   }
 
   async saveImgUrl(
@@ -71,13 +87,13 @@ export class TodoAccess {
     attachmentUrl: string
   ): Promise<void> {
     await this.docClient.update({
-        TableName: this.todosTable,
-        Key: { userId, todoId },
-        ConditionExpression: 'attribute_exists(todoId)',
-        UpdateExpression: 'set attachmentUrl = :attachmentUrl',
-        ExpressionAttributeValues: {
-          ':attachmentUrl': attachmentUrl
-        }
-      }).promise()
+      TableName: this.todosTable,
+      Key: {userId, todoId},
+      ConditionExpression: 'attribute_exists(todoId)',
+      UpdateExpression: 'set attachmentUrl = :attachmentUrl',
+      ExpressionAttributeValues: {
+        ':attachmentUrl': attachmentUrl
+      }
+    }).promise()
   }
 }
